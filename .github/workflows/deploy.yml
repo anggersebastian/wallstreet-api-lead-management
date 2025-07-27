@@ -28,6 +28,19 @@ jobs:
       run: |
         gcloud config set compute/zone ${{ secrets.GCP_ZONE }}
         gcloud config list
+        
+        # Beri izin yang diperlukan
+        gcloud projects add-iam-policy-binding ${{ secrets.GCP_PROJECT_ID }} \
+          --member="serviceAccount:github-actions-deploy@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
+          --role="roles/compute.instanceAdmin"
+        
+        gcloud projects add-iam-policy-binding ${{ secrets.GCP_PROJECT_ID }} \
+          --member="serviceAccount:github-actions-deploy@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
+          --role="roles/compute.osAdminLogin"
+        
+        gcloud compute instances add-metadata ${{ secrets.GCP_VM_NAME }} \
+          --zone ${{ secrets.GCP_ZONE }} \
+          --metadata enable-os-login=TRUE
 
     - name: Deploy to VM
       run: |-
