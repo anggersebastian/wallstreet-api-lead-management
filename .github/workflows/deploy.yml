@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy to GCP VM
 
 on:
   push:
@@ -7,22 +7,30 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.7.0
+    - name: Setup Google Cloud
+      uses: google-github-actions/setup-gcloud@v1
       with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        export_default_credentials: true
 
-    - name: Deploy to VPS
-      run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-        cd /var/www/wallstreet-api-lead-management
-        git pull origin main
-        composer install --no-dev --optimize-autoloader
-        php artisan migrate --force
-        php artisan optimize
-        sudo systemctl restart php8.2-fpm nginx
-        EOF
+    - name: Deploy to VM
+      run: |-
+        gcloud compute ssh ${{ secrets.GCP_VM_NAME }} \
+          --zone ${{ secrets.GCP_ZONE }} \
+          --command='
+            cd /var/www/wallstreet-api-lead-management
+            sudo -u www-data git pull origin master
+            sudo -u www-data composer install --no-dev --optimize-autoloader
+            sudo -u www-data php artisan view:clear
+            sudo -u www-data php artisan cache:clear
+            sudo systemctl restart php8.2-fpm nginx
+            echo "Deployment successful!"
+          '
